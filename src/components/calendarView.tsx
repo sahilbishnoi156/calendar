@@ -11,7 +11,6 @@ import { useCalendarStore } from "@/store/calenderStore";
 import { Holiday } from "@/interfaces/holiday";
 import { fetchHolidays, fetchQuarterlyHolidays } from "@/lib/calendarService";
 
-
 const renderCalendarGrid = (
   year: number,
   month: number,
@@ -24,18 +23,46 @@ const renderCalendarGrid = (
     today.getFullYear() === year && today.getMonth() === month;
 
   const weeks: Array<
-    (null | { day: number; holidays: Holiday[]; isToday: boolean })[]
+    ({
+      day: number;
+      holidays: Holiday[];
+      isToday: boolean;
+      isCurrentMonth: boolean;
+    })[]
   > = Array.from(
     { length: Math.ceil((daysInMonth + firstDayOfMonth) / 7) },
     (_, weekIndex) => {
       return Array.from({ length: 7 }, (_, dayIndex) => {
         const day = weekIndex * 7 + dayIndex - firstDayOfMonth + 1;
-        if (day < 1 || day > daysInMonth) return null;
+        if (day < 1) {
+          // Previous month
+          const prevMonth = month === 0 ? 11 : month - 1;
+          const prevYear = month === 0 ? year - 1 : year;
+          const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+          const prevDay = daysInPrevMonth + day;
+          return {
+            day: prevDay,
+            holidays: [],
+            isToday: false,
+            isCurrentMonth: false,
+          };
+        }
+        if (day > daysInMonth) {
+          // Next month
+          const nextDay = day - daysInMonth;
+          return {
+            day: nextDay,
+            holidays: [],
+            isToday: false,
+            isCurrentMonth: false,
+          };
+        }
         const dayHolidays = holidays.filter((h) => h.date.getDate() === day);
         return {
           day,
           holidays: dayHolidays,
           isToday: isCurrentMonth && today.getDate() === day,
+          isCurrentMonth: true,
         };
       });
     }
@@ -49,14 +76,17 @@ const renderCalendarGrid = (
         {weekDays.map((day) => (
           <div
             key={day}
-            className="p-2 text-center text-sm font-medium text-muted-foreground"
+            className="p-2 text-center text-sm font-medium text-muted-foreground bg-gray-100/80 dark:bg-gray-800/50 rounded-md"
           >
             {day}
           </div>
         ))}
       </div>
       {weeks.map((week, weekIndex) => {
-        const totalHolidays = week.reduce((acc, day) => acc + (day?.holidays.length || 0), 0);
+        const totalHolidays = week.reduce(
+          (acc, day) => acc + (day?.holidays.length || 0),
+          0
+        );
         return (
           <div
             key={weekIndex}
@@ -72,9 +102,9 @@ const renderCalendarGrid = (
               <div
                 key={dayIndex}
                 className={cn(
-                  "aspect-square flex flex-col items-center justify-center p-1 rounded-md transition-all hover:bg-blue-200/20 relative",
+                  "flex flex-col items-center justify-center p-1 rounded-md transition-all hover:bg-blue-300/20 relative aspect-video",
                   day?.isToday &&
-                    "bg-primary text-primary-foreground font-semibold shadow-md hover:bg-primary/90",
+                    "bg-blue-400 text-primary-foreground font-semibold shadow-md hover:bg-blue-400/80",
                   day &&
                     day.holidays.length > 0 &&
                     !day.isToday &&
@@ -87,7 +117,8 @@ const renderCalendarGrid = (
                     <span
                       className={cn(
                         "text-sm relative z-10",
-                        day.isToday ? "font-bold" : "font-medium"
+                        day.isToday ? "font-bold" : "font-medium",
+                        day.isCurrentMonth ? "" : "text-gray-500"
                       )}
                     >
                       {day.day}
@@ -98,9 +129,9 @@ const renderCalendarGrid = (
                           <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full" />
                         ) : (
                           <div className="flex gap-0.5">
-                            {Array.from({ length: 3 }).map((_, i) => (
+                            {day?.holidays.map((item,index) => (
                               <div
-                                key={i}
+                                key={item.id}
                                 className="w-1 h-1 bg-green-600 dark:bg-green-400 rounded-full"
                               />
                             ))}
@@ -172,7 +203,7 @@ export default function CalendarView() {
     if (view === "monthly") {
       return (
         <div className="space-y-6">
-          <Card className="sm:p-6 p-2">
+          <Card className="sm:p-6 p-2 border-none">
             {renderCalendarGrid(year, month, holidays)}
           </Card>
 
@@ -320,10 +351,6 @@ export default function CalendarView() {
     <div className="bg-white flex flex-1 rounded-xl sm:ml-6 sm:mb-6  min-h-screen overflow-y-auto">
       <div className="w-full sm:p-6 p-2 rounded-xl">
         <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" size="sm" onClick={prevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
           <h2 className="text-xl font-semibold text-balance">
             {view === "quarterly"
               ? `Q${Math.floor(month / 3) + 1} ${year}`
@@ -332,10 +359,20 @@ export default function CalendarView() {
                   year: "numeric",
                 })}
           </h2>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={prevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
 
-          <Button variant="ghost" size="sm" onClick={nextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            <Button variant="ghost" size="sm" onClick={nextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <div>
+              <Badge className="bg-blue-100 text-blue-800 py-1.5">
+                {holidays.length} Holidays
+              </Badge>
+            </div>
+          </div>
         </div>
 
         {loading && (

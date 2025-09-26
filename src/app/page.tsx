@@ -8,7 +8,7 @@ export default function Page() {
     <div className="h-screen flex flex-col overflow-hidden bg-[#f8fafd]">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" id="scrollableDiv">
           <CalendarView />
         </div>
         <CollapsableSheet />

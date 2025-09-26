@@ -11,6 +11,8 @@ export const useCalendarStore = create<CalendarState>((set) => ({
   month: new Date().getMonth(),
   view: "monthly",
   isSheetOpen: true,
+  isVacationMode: false,
+
 
   setCountry: (country) => set({ country }),
   setYear: (year) => set({ year }),
@@ -44,4 +46,5 @@ export const useCalendarStore = create<CalendarState>((set) => ({
     }),
 
   toggleSheet: () => set((state) => ({ isSheetOpen: !state.isSheetOpen })),
+  toggleVacationMode: () => set((state) => ({ isVacationMode: !state.isVacationMode })),
 }))

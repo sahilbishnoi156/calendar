@@ -1,4 +1,4 @@
-import { Country } from "./Country"
+import { Country } from "./country"
 
 export type ViewType = "monthly" | "quarterly"
 
@@ -15,4 +15,6 @@ export interface CalendarState {
   nextMonth: () => void
   prevMonth: () => void
   toggleSheet: () => void
+  isVacationMode: boolean
+  toggleVacationMode: () => void
 }
