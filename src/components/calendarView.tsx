@@ -10,11 +10,15 @@ import { CalendarState } from "@/interfaces/calendarStore";
 import { useCalendarStore } from "@/store/calenderStore";
 import { Holiday } from "@/interfaces/holiday";
 import { fetchHolidays, fetchQuarterlyHolidays } from "@/lib/calendarService";
+import { WeekDay } from "@/interfaces/weekDay";
+import Link from "next/link";
 
 const renderCalendarGrid = (
   year: number,
   month: number,
-  holidays: Holiday[]
+  holidays: Holiday[],
+  isVacationMode: boolean = false,
+  viewMode: "monthly" | "quarterly" = "monthly"
 ) => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -23,12 +27,7 @@ const renderCalendarGrid = (
     today.getFullYear() === year && today.getMonth() === month;
 
   const weeks: Array<
-    ({
-      day: number;
-      holidays: Holiday[];
-      isToday: boolean;
-      isCurrentMonth: boolean;
-    })[]
+    (WeekDay)[]
   > = Array.from(
     { length: Math.ceil((daysInMonth + firstDayOfMonth) / 7) },
     (_, weekIndex) => {
@@ -38,7 +37,11 @@ const renderCalendarGrid = (
           // Previous month
           const prevMonth = month === 0 ? 11 : month - 1;
           const prevYear = month === 0 ? year - 1 : year;
-          const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+          const daysInPrevMonth = new Date(
+            prevYear,
+            prevMonth + 1,
+            0
+          ).getDate();
           const prevDay = daysInPrevMonth + day;
           return {
             day: prevDay,
@@ -70,13 +73,24 @@ const renderCalendarGrid = (
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  const checkConsecutiveHoliday = (day: WeekDay) => {
+    if (day.holidays.length === 0) return false;
+    const holidayDates = day.holidays.map(h => h.date.getDate());
+    for (let date of holidayDates) {
+      if (holidays.some(h => h.date.getDate() === date - 1) || holidays.some(h => h.date.getDate() === date + 1)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   return (
     <div className="space-y-1">
       <div className="grid grid-cols-7 gap-1 mb-2">
         {weekDays.map((day) => (
           <div
             key={day}
-            className="p-2 text-center text-sm font-medium text-muted-foreground bg-gray-100/80 dark:bg-gray-800/50 rounded-md"
+            className="p-2 text-center text-sm font-medium text-muted-foreground bg-gray-100/50 dark:bg-gray-800/50 rounded-md"
           >
             {day}
           </div>
@@ -87,29 +101,36 @@ const renderCalendarGrid = (
           (acc, day) => acc + (day?.holidays.length || 0),
           0
         );
+        if (totalHolidays === 0 && isVacationMode) {
+          return null;
+        }
         return (
           <div
             key={weekIndex}
             className={cn(
-              "grid grid-cols-7 gap-1 rounded-lg p-2 transition-all duration-200",
+              "grid grid-cols-7 gap-1 rounded-lg sm:p-1 transition-all duration-200",
               totalHolidays > 1 &&
                 "bg-green-300/60 dark:bg-green-800/30 border border-green-300 dark:border-green-700",
               totalHolidays === 1 &&
                 "bg-green-100/60 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
             )}
           >
-            {week.map((day, dayIndex) => (
-              <div
+            {week.map((day, dayIndex) => {
+              const isConsecutiveHoliday = checkConsecutiveHoliday(day)
+              return <Link
+                href={`#${day?.holidays[0]?.id || ""}`}
                 key={dayIndex}
                 className={cn(
-                  "flex flex-col items-center justify-center p-1 rounded-md transition-all hover:bg-blue-300/20 relative aspect-video",
+                  "flex flex-col items-center justify-center p-1 rounded-md transition-all hover:bg-blue-300/20 relative aspect-video h-full",
                   day?.isToday &&
                     "bg-blue-400 text-primary-foreground font-semibold shadow-md hover:bg-blue-400/80",
                   day &&
                     day.holidays.length > 0 &&
                     !day.isToday &&
                     " dark:bg-green-900/40  ",
-                  !day && "opacity-0"
+                  !day && "opacity-0",
+                  isConsecutiveHoliday && "bg-yellow-400/40 hover:bg-yellow-400 px-1 rounded-md",
+                  viewMode === "quarterly" && "aspect-square "
                 )}
               >
                 {day && (
@@ -118,7 +139,7 @@ const renderCalendarGrid = (
                       className={cn(
                         "text-sm relative z-10",
                         day.isToday ? "font-bold" : "font-medium",
-                        day.isCurrentMonth ? "" : "text-gray-500"
+                        day.isCurrentMonth ? "" : "text-gray-400",
                       )}
                     >
                       {day.day}
@@ -129,7 +150,7 @@ const renderCalendarGrid = (
                           <div className="w-1.5 h-1.5 bg-green-600 dark:bg-green-400 rounded-full" />
                         ) : (
                           <div className="flex gap-0.5">
-                            {day?.holidays.map((item,index) => (
+                            {day?.holidays.map((item, index) => (
                               <div
                                 key={item.id}
                                 className="w-1 h-1 bg-green-600 dark:bg-green-400 rounded-full"
@@ -141,8 +162,8 @@ const renderCalendarGrid = (
                     )}
                   </>
                 )}
-              </div>
-            ))}
+              </Link>;
+            })}
           </div>
         );
       })}
@@ -151,16 +172,18 @@ const renderCalendarGrid = (
 };
 
 export default function CalendarView() {
-  const { month, year, view, country, nextMonth, prevMonth } = useCalendarStore(
-    useShallow((state: CalendarState) => ({
-      month: state.month,
-      year: state.year,
-      view: state.view,
-      country: state.country,
-      nextMonth: state.nextMonth,
-      prevMonth: state.prevMonth,
-    }))
-  );
+  const { month, year, view, country, nextMonth, prevMonth, isVacationMode } =
+    useCalendarStore(
+      useShallow((state: CalendarState) => ({
+        month: state.month,
+        year: state.year,
+        view: state.view,
+        country: state.country,
+        nextMonth: state.nextMonth,
+        prevMonth: state.prevMonth,
+        isVacationMode: state.isVacationMode,
+      }))
+    );
 
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,7 +227,7 @@ export default function CalendarView() {
       return (
         <div className="space-y-6">
           <Card className="sm:p-6 p-2 border-none">
-            {renderCalendarGrid(year, month, holidays)}
+            {renderCalendarGrid(year, month, holidays, isVacationMode, view)}
           </Card>
 
           {holidays.length > 0 && (
@@ -276,7 +299,7 @@ export default function CalendarView() {
                     </p>
                   </div>
                   <div className="scale-90 origin-top">
-                    {renderCalendarGrid(year, monthIndex, monthHolidays)}
+                    {renderCalendarGrid(year, monthIndex, monthHolidays, isVacationMode, view)}
                   </div>
                 </Card>
               );
@@ -313,6 +336,7 @@ export default function CalendarView() {
                         {monthHolidays.map((holiday) => (
                           <div
                             key={holiday.id}
+                            id={`${holiday.id}`}
                             className="flex items-start gap-2 p-2 rounded-md bg-muted/30"
                           >
                             <Badge
